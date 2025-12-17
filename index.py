@@ -331,8 +331,8 @@ OCENA:
             problems = []
             # Dodaje punkty za długość hasła
             score_100 += min(length * 5, 50)
-            if length < 8:
-                problems.append("Zbyt krótkie hasło (potrzeba więcej znaków niż 8)")
+            if length < 10:
+                problems.append("Zbyt krótkie hasło (potrzeba więcej znaków niż 10)")
             # Dodaje punkty za różnorodne znaki
             char_types = 0
             if any(c.islower() for c in password): char_types += 1
@@ -342,10 +342,10 @@ OCENA:
             score_100 += char_types * 10
             lower_password = password.lower()
             # Sprawdza czy hasło znajduje się w słowniku
-            if hasattr(self, 'dictionary') and self.dictionary:
-                for word in self.dictionary:
+            if hasattr(self, 'common_passwords') and self.common_passwords:
+                for word in self.common_passwords:
                     if len(word) > 3 and word in lower_password:
-                        score_100 -= 25
+                        score_100 -= 40
                         problems.append(f"Zawiera hasło słownikowe: '{word}' ")
                         break
             # Sprawdza powtarzające się sekwencje
@@ -361,6 +361,9 @@ OCENA:
                     score_100 -= 10
                     problems.append(f"Zawiera rok lub datę: '{year}'.")
                     break
+            #Ustawianie granicy , aby nie dawało wysokiego wyniku hasłom z błedami
+            if problems and score_100 > 60:
+                score_100 = 60
             # Zamiana wyniku z skali 0 do 100 na skale od 0 do 4
             final_score_100 = max(0, min(100, score_100))
             if final_score_100 >= 80:
@@ -381,7 +384,15 @@ OCENA:
             if not password:
                 messagebox.showwarning("Brak hasła", "Wprowadź hasło do analizy.")
                 return
+            self.update_stats(password)
             score_4, problems = self.calculate_password_strength_zxcvbn(password)
+            ###Łączenie powtarzających się znaków specjalnych, liter oraz cyfr np: "aaaaa" w "a"
+            import re
+            crack_test_password = re.sub(r'(.)\1+', r'\1', password)
+            if len(crack_test_password) < len(password):
+                estimated_time = self.estimate_crack_time(crack_test_password)
+            else:
+                estimated_time = self.estimate_crack_time(password)
             strength_map = {
                 0: "0. Bardzo Słabe",
                 1: "1. Słabe",
@@ -391,30 +402,29 @@ OCENA:
             }
             strength = strength_map[score_4]
             score_100 = score_4 * 25
-            estimated_time = self.estimate_crack_time(password)
             self.update_strength_meter(score_100, strength)
             self.result_text.delete(1.0, tk.END)
             report = f"""
-    {'=' * 60}
-    ANALIZA HASŁA (METODA ZXCVBN-LIKE)
-    {'=' * 60}
-    Hasło: {'*' * len(password)}
-    Długość: {len(password)} znaków
-    Siła: {strength} ({score_4}/4)
-    Szacowany czas łamania: {estimated_time}
-    ANALIZA SKŁADUU:
-    • Duże litery: {'✓' if any(c.isupper() for c in password) else '✗'}
-    • Małe litery: {'✓' if any(c.islower() for c in password) else '✗'}
-    • Cyfry: {'✓' if any(c.isdigit() for c in password) else '✗'}
-    • Znaki specjalne: {'✓' if any(not c.isalnum() for c in password) else '✗'}
-    OCENA:
-    """
-            report += "\nWYKRYTE PROBLEMY/ KARY ZA WZORCE\n"
+{'=' * 60}
+ANALIZA HASŁA (METODA ZXCVBN-LIKE)
+{'=' * 60}
+Hasło: {'*' * len(password)}
+Długość: {len(password)} znaków
+Siła: {strength} ({score_4}/4)
+Szacowany czas łamania: {estimated_time}
+ANALIZA SKŁADU:
+• Duże litery: {'✓' if any(c.isupper() for c in password) else '✗'}
+• Małe litery: {'✓' if any(c.islower() for c in password) else '✗'}
+• Cyfry: {'✓' if any(c.isdigit() for c in password) else '✗'}
+• Znaki specjalne: {'✓' if any(not c.isalnum() for c in password) else '✗'}
+OCENA:
+"""
+            report += "\nWYKRYTE PROBLEMY ORAZ KARY ZA WZORCE:\n"
             if problems:
                 for p in problems:
                     report += f"{p}\n"
             else:
-                report += "Nie wykryto żadnych problemów"
+                report += "\nNie wykryto żadnych problemów\n"
             report += "\nOCENA KOŃCOWA I WSKAZÓWKI:\n"
             if score_4 <= 1:
                 report += "• Hasło jest zbyt słabe! Użyj dłuższego hasła z różnymi typami znaków.\n"
