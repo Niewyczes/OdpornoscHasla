@@ -402,7 +402,7 @@ OCENA:
     Długość: {len(password)} znaków
     Siła: {strength} ({score_4}/4)
     Szacowany czas łamania: {estimated_time}
-    ANALIZA SKŁADU:
+    ANALIZA SKŁADUU:
     • Duże litery: {'✓' if any(c.isupper() for c in password) else '✗'}
     • Małe litery: {'✓' if any(c.islower() for c in password) else '✗'}
     • Cyfry: {'✓' if any(c.isdigit() for c in password) else '✗'}
