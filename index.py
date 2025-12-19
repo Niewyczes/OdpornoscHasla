@@ -68,6 +68,23 @@ class PasswordStrengthAnalyzer:
             pass
 
         return set(common)
+    #Ładuje pliki i skleja je i zwraca jeden słownik
+    def load_hybrid_passwords(self):
+        #Tworzenie słownika
+        hybrid_dict={
+            'names':[],
+            'adjectives':[],
+            'special':[]
+        }
+        #Szukanie po nazwie pliku i próba otworzenia go
+        for category in hybrid_dict.keys():
+            filename=f"{category}.txt"
+            try:
+                with open (filename, "r", encoding="utf-8") as f:
+                    hybrid_dict[category]=[line.strip() for line in f if line.strip()]
+            except FileNotFoundError:
+                print(f"Brak pliku {filename}")
+        return hybrid_dict
 
     def create_widgets(self):
         """Tworzy wszystkie elementy GUI"""
@@ -107,7 +124,8 @@ class PasswordStrengthAnalyzer:
                    command=self.start_brute_force_test).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Test Słownikowy",
                    command=self.start_dictionary_test).pack(side=tk.LEFT, padx=5)
-
+        ttk.Button(button_frame, text="Test Hybrydowy",
+                   command=self.start_hybrid_test).pack(side=tk.LEFT, padx=5)
         # Pasek postępu
         self.progress_var = tk.DoubleVar()
         self.progress_bar = ttk.Progressbar(main_frame, variable=self.progress_var,
@@ -322,7 +340,6 @@ OCENA:
         report += f"\nWskazówka: Użyj menedżera haseł do generowania i przechowywania silnych haseł."
 
         self.result_text.insert(1.0, report)
-
         # Wstępnie dodany zxcvbn
     def calculate_password_strength_zxcvbn(self, password):
             "Oblicza siłę hasła za pomocą ZXCVBN-like"
@@ -479,7 +496,7 @@ OCENA:
         self.testing = True
         self.stop_test = False
         self.progress_var.set(0)
-
+        self.update_stats(password)
         chars = ''
         if any(c.islower() for c in password):
             chars += string.ascii_lowercase
@@ -560,7 +577,7 @@ OCENA:
         self.testing = True
         self.stop_test = False
         self.progress_var.set(0)
-
+        self.update_stats(password)
         start_time = time.time()
         found = False
         attempts = 0
@@ -622,6 +639,75 @@ OCENA:
         self.stop_button.config(state=tk.DISABLED)
         self.progress_var.set(100)
 
+    def hybrid_test(self, password):
+        """Symuluje atak hybrydowy"""
+        self.testing =True
+        self.stop_test=False
+        self.progress_var.set(0)
+        self.result_text.delete(1.0, tk.END)
+        start_time = time.time()
+        self.update_stats(password)
+        found = False
+        attempts = 0
+        hybrid_dict=self.load_hybrid_passwords()
+        # Pasek postępu dla ataku hybrydowego
+        #Mnozenie 3 wariantów names z 3 wariantami adjectives i 5 różnych kombinacji
+        base_combos = len(hybrid_dict['names']) * len(hybrid_dict['adjectives']) * len(hybrid_dict['special'])
+        total = base_combos * 3 * 3 * 5
+        self.result_text.delete(1.0, tk.END)
+        self.result_text.insert(1.0, f"Rozpoczynanie ataku hybrydowego...\n")
+        self.result_text.insert(tk.END, f"Rozmiar bazy: {total :,} haseł\n")
+        self.result_text.insert(tk.END, f"{'=' * 60}\n")
+        #Załadowanie części ze słownika hybrid_dict
+        parts=itertools.product(
+            hybrid_dict['names'],
+            hybrid_dict['adjectives'],
+            hybrid_dict['special']
+        )
+        for names, adjectives, special in parts:
+            if self.stop_test: break
+            #Dla imion i przymiotników sprawdzenie wariacji dla małych/dużych/pisanych kapitalikami
+            for name_var in {names.lower(), names.capitalize(), names.upper()}:
+                for adj_var in {adjectives.lower(), adjectives.capitalize(), adjectives.upper()}:
+                    variants = [
+               ### # Składamy hasło z elementów słownika#
+                # i tworzymy różne warianty haseł#
+                         f"{special}{name_var}{adj_var}",
+                        f"{name_var}{adj_var}{special}",
+                        f"{adj_var}{special}{name_var}",
+                        f"{adj_var}{name_var}{special}",
+                        f"{name_var}{special}{adj_var}"]
+
+                    for PPAP in variants:
+                        attempts += 1
+                        if PPAP==password:
+                            found=True
+                            break
+                        if attempts % 1000000 ==0:
+                            progress=(attempts/total)*100
+                            self.progress_var.set(progress)
+                            self.result_text.insert(tk.END, f"Próba {attempts:,}: {PPAP}\n")
+                            self.result_text.see(tk.END)
+                            self.root.update()
+            if found: break
+        elapsed_time = time.time() - start_time
+        # Wyświetlenie wyników
+        self.result_text.insert(tk.END, f"\n{'=' * 60}\n")
+        self.result_text.insert(tk.END, "WYNIK ATAKU HYBRYDOWEGO:\n")
+        self.result_text.insert(tk.END, f"{'=' * 60}\n")
+        self.result_text.insert(tk.END, f"Czas testu: {elapsed_time:.2f} sekund\n")
+        self.result_text.insert(tk.END, f"Liczba prób: {attempts:,}\n")
+        self.result_text.insert(tk.END, f"Hasło złamane: {'TAK' if found else 'NIE'}\n")
+
+        if found:
+            self.result_text.insert(tk.END, f"\n⚠️  UWAGA: Twoje hasło zostało złamane!\n")
+            self.result_text.insert(tk.END, f"Zalecenie: Natychmiast zmień to hasło na bardziej unikalne.\n")
+        else:
+            self.result_text.insert(tk.END, f"\n✓ Hasło nie znajduje się w bazie danych\n")
+
+        self.testing = False
+        self.stop_button.config(state=tk.DISABLED)
+        self.progress_var.set(100)
     def start_brute_force_test(self):
         """Uruchamia test brute-force w osobnym wątku"""
         password = self.password_entry.get()
@@ -652,6 +738,21 @@ OCENA:
 
         self.stop_button.config(state=tk.NORMAL)
         thread = Thread(target=self.dictionary_test, args=(password,), daemon=True)
+        thread.start()
+
+    def start_hybrid_test(self):
+        "Uruchamia test hybrydowy w osobnym wątku"
+        password = self.password_entry.get()
+        if not password:
+            messagebox.showwarning("Brak hasła", "Wprowadź hasło do testu.")
+            return
+
+        if self.testing:
+            messagebox.showwarning("Test w toku", "Poczekaj na zakończenie obecnego testu.")
+            return
+
+        self.stop_button.config(state=tk.NORMAL)
+        thread = Thread(target=self.hybrid_test, args=(password,), daemon=True)
         thread.start()
 
     def stop_test_func(self):
