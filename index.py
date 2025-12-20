@@ -664,8 +664,15 @@ OCENA:
             hybrid_dict['adjectives'],
             hybrid_dict['special']
         )
+        #Próba z numbą+ można zrównoleglić
+        #CPU
+        #Sprobować wariant w któym tworzymy duzą bazę danych do jednego pilku
         # można też odfiltrować na to aby znalazło najpierw a później odfiltrowało b b  potem znalazło część wspólną ab
-        #Zamienić tak aby robiłkolejny plik ze wszystkim opcjami
+        #Tu można workers i oddzielne zadania asynchronicznie
+        #Zamienić tak aby robił kolejny plik ze wszystkim opcjami
+        #Zrobić asyncio, await
+        #korutyna spróbuj z max workers=1
+        #parquel
         for names, adjectives, special in parts:
             if self.stop_test: break
             #Dla imion i przymiotników sprawdzenie wariacji dla małych/dużych/pisanych kapitalikami
@@ -679,6 +686,7 @@ OCENA:
                         if PPAP==password:
                             found=True
                             break
+                            #Jeśli nie znajdzie to użyć funkcji bruteforce też zooptymalizowanie
                         if attempts % 1000000 ==0:
                             progress=(attempts/total)*100
                             self.progress_var.set(progress)
