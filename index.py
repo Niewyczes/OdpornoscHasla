@@ -9,6 +9,7 @@ from tkinter import ttk, messagebox, scrolledtext
 import time
 import itertools
 import string
+from itertools import permutations
 from datetime import timedelta
 from threading import Thread
 #import requests
@@ -411,11 +412,11 @@ OCENA:
             else:
                 estimated_time = self.estimate_crack_time(password)
             strength_map = {
-                0: "0. Bardzo Słabe",
-                1: "1. Słabe",
-                2: "2. Umiarkowane",
-                3: "3. Silne",
-                4: "4. Bardzo silne"
+                0: " Bardzo Słabe",
+                1: " Słabe",
+                2: " Umiarkowane",
+                3: " Silne",
+                4: " Bardzo silne"
             }
             strength = strength_map[score_4]
             score_100 = score_4 * 25
@@ -490,7 +491,6 @@ OCENA:
         self.stats_labels['lowercase'].config(text=str(sum(1 for c in password if c.islower())))
         self.stats_labels['digits'].config(text=str(sum(1 for c in password if c.isdigit())))
         self.stats_labels['special'].config(text=str(sum(1 for c in password if not c.isalnum())))
-
     def brute_force_test(self, password):
         """Symuluje atak brute-force"""
         self.testing = True
@@ -653,7 +653,7 @@ OCENA:
         # Pasek postępu dla ataku hybrydowego
         #Mnozenie 3 wariantów names z 3 wariantami adjectives i 5 różnych kombinacji
         base_combos = len(hybrid_dict['names']) * len(hybrid_dict['adjectives']) * len(hybrid_dict['special'])
-        total = base_combos * 3 * 3 * 5
+        total = base_combos * 3 * 3 *6 #5
         self.result_text.delete(1.0, tk.END)
         self.result_text.insert(1.0, f"Rozpoczynanie ataku hybrydowego...\n")
         self.result_text.insert(tk.END, f"Rozmiar bazy: {total :,} haseł\n")
@@ -664,20 +664,16 @@ OCENA:
             hybrid_dict['adjectives'],
             hybrid_dict['special']
         )
+        # można też odfiltrować na to aby znalazło najpierw a później odfiltrowało b b  potem znalazło część wspólną ab
+        #Zamienić tak aby robiłkolejny plik ze wszystkim opcjami
         for names, adjectives, special in parts:
             if self.stop_test: break
             #Dla imion i przymiotników sprawdzenie wariacji dla małych/dużych/pisanych kapitalikami
             for name_var in {names.lower(), names.capitalize(), names.upper()}:
                 for adj_var in {adjectives.lower(), adjectives.capitalize(), adjectives.upper()}:
-                    variants = [
-               ### # Składamy hasło z elementów słownika#
-                # i tworzymy różne warianty haseł#
-                         f"{special}{name_var}{adj_var}",
-                        f"{name_var}{adj_var}{special}",
-                        f"{adj_var}{special}{name_var}",
-                        f"{adj_var}{name_var}{special}",
-                        f"{name_var}{special}{adj_var}"]
-
+                    # Składamy hasło z elementów słownika#
+                    combo_parts = [special, name_var, adj_var]
+                    variants = ["".join(p) for p in permutations(combo_parts)]
                     for PPAP in variants:
                         attempts += 1
                         if PPAP==password:
