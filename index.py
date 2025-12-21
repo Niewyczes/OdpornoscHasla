@@ -1,8 +1,6 @@
-#sprawdzić czy jest wystarczająco obiektowo
 #dodać nowe metody
 #pasek postępu wyrzucić? moim zdaniem niech zostanie, zawesze to jakiś bajer. Tylko przy brute-force dziwne działa(tak na logikę to ciężko go będzie zaprogramować z brute-forcem)
 #poprawić pasek siły hasła?
-#jak w słowniku jest wyraz zupa i jak w haśle wpiszemy zupa123 to czemu to wykrywa
 #czemu metodą słownikową nie odczytuje alfabetycznie?
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
@@ -53,12 +51,12 @@ class PasswordStrengthAnalyzer:
         """Ładuje listę popularnych haseł"""
         common = [
             '123456', 'password', '12345678', 'qwerty', '123456789',
-            '12345', '1234', '111111', '1234567', 'dragon',
-            '123123', 'baseball', 'abc123', 'football', 'monkey',
-            'letmein', '696969', 'shadow', 'master', '666666',
+            '12345', '1234', '111111', '1234567', 'smok',
+            '123123', 'pilka', 'abc123', 'football', 'monkey',
+            'wpuscmnie', '696969', 'cien', 'master', '666666',
             'qwertyuiop', '123321', 'mustang', '1234567890',
-            'michael', '654321', 'superman', '1qaz2wsx', '7777777',
-            'password1', 'freedom', 'admin', 'login', 'welcome'
+            'michal', '654321', 'superman', '1qaz2wsx', '7777777',
+            'password1', 'wolnosc', 'admin', 'login', 'welcome'
         ]
 
         # Próba załadowania z pliku
@@ -167,7 +165,7 @@ class PasswordStrengthAnalyzer:
             ("Małe litery", "lowercase"),
             ("Cyfry", "digits"),
             ("Znaki specjalne", "special"),
-            ("Czas łamania (BF)", "bf_time")
+      #      ("Czas łamania (BF)", "bf_time")
         ]
 
         for i, (name, key) in enumerate(stats):
