@@ -7,7 +7,7 @@ from tkinter import ttk, messagebox, scrolledtext
 import time
 import itertools
 import string
-from itertools import permutations
+from itertools import permutations, product
 from datetime import timedelta
 from threading import Thread
 #import requests
@@ -227,6 +227,14 @@ class PasswordStrengthAnalyzer:
             strength = "Bardzo silne"
 
         return score, strength
+
+    def on_the_fly_variants(word):
+        """Generuje warianty liter on_the_fly"""
+        for pattern in product([0,1],repeat=len(word)):
+            yield ''.join(
+                c.upper() if bit else c.lower()
+                for c, bit in zip(word, pattern)
+            )
 
     def estimate_crack_time(self, password):
         """Szacuje czas potrzebny do złamania hasła"""
@@ -636,7 +644,23 @@ OCENA:
         self.testing = False
         self.stop_button.config(state=tk.DISABLED)
         self.progress_var.set(100)
-
+    def hybrid_test_stage1_worker(file_path,hybrid_dict,password,name_chunk,adj_chunk,target_length):
+        """Worker dla pierwszego etapu ataku hybrydowego"""
+        specs=hybrid_dict['special']
+        candidates={"names":set(),"adjs":set(),"structures":set()}
+        for name in name_chunk:
+            for adj in adj_chunk:
+                for spec in specs:
+                    parts=[spec,name,adj]
+                    for p in permutations(parts):
+                        combo="".join(p)
+                        if len(combo)==target_length:
+                            candidates["names"].add(name)
+                            candidates["adjs"].add(adj)
+                            candidates["structures"].add(p)
+                            if combo==password:
+                                return {"found": True, "match":combo, "candidates":candidates}
+        return {"found": True,"candidates":candidates}
     def hybrid_test(self, password):
         """Symuluje atak hybrydowy"""
         self.testing =True
@@ -662,15 +686,6 @@ OCENA:
             hybrid_dict['adjectives'],
             hybrid_dict['special']
         )
-        #Próba z numbą+ można zrównoleglić
-        #CPU
-        #Sprobować wariant w któym tworzymy duzą bazę danych do jednego pilku
-        # można też odfiltrować na to aby znalazło najpierw a później odfiltrowało b b  potem znalazło część wspólną ab
-        #Tu można workers i oddzielne zadania asynchronicznie
-        #Zamienić tak aby robił kolejny plik ze wszystkim opcjami
-        #Zrobić asyncio, await
-        #korutyna spróbuj z max workers=1
-        #parquel
         for names, adjectives, special in parts:
             if self.stop_test: break
             #Dla imion i przymiotników sprawdzenie wariacji dla małych/dużych/pisanych kapitalikami
