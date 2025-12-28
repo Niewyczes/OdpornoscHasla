@@ -3,19 +3,63 @@
 #poprawić pasek siły hasła?
 #czemu metodą słownikową nie odczytuje alfabetycznie?
 import tkinter as tk
+from concurrent.futures.process import ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from tkinter import ttk, messagebox, scrolledtext
 import time
 import itertools
 import string
 from itertools import permutations, product
 from datetime import timedelta
+import threading
 from threading import Thread
 #import requests
 from urllib.parse import urlparse
+import re
+import queue
+#Zainportowane moduły
+#------------------------
+from hybrid_dictionary import (
+    start_hybrid_dictionary,
+    run_hybrid_dictionary,
+    hybrid_dictionary_worker,
+    on_done_hybrid_dictionary,
+    finish_hybrid_dictionary
+)
 
+from human_pattern_test import (
+    start_human_pattern_test,
+    run_human_pattern_test,
+    finish_human_pattern_test
+)
+
+from mask_test import (
+    start_mask,
+    run_mask,
+    finish_mask
+)
+#----------------------------
 
 class PasswordStrengthAnalyzer:
     def __init__(self, root):
+        #Dodanie wywoływań modułów
+        # --- HYBRID DICTIONARY ---
+        self.start_hybrid_dictionary = start_hybrid_dictionary.__get__(self)
+        self.run_hybrid_dictionary = run_hybrid_dictionary.__get__(self)
+        self.hybrid_dictionary_worker = hybrid_dictionary_worker.__get__(self)
+        self.on_done_hybrid_dictionary = on_done_hybrid_dictionary.__get__(self)
+        self.finish_hybrid_dictionary = finish_hybrid_dictionary.__get__(self)
+
+        # --- HUMAN PATTERN TEST ---
+        self.start_human_pattern_test = start_human_pattern_test.__get__(self)
+        self.run_human_pattern_test = run_human_pattern_test.__get__(self)
+        self.finish_human_pattern_test = finish_human_pattern_test.__get__(self)
+
+        # --- MASK ---
+        self.start_mask = start_mask.__get__(self)
+        self.run_mask = run_mask.__get__(self)
+        self.finish_mask = finish_mask.__get__(self)
+
         self.root = root
         self.root.title("Analizator Siły Hasła")
         self.root.geometry("700x650")
@@ -30,9 +74,13 @@ class PasswordStrengthAnalyzer:
         # Zmienne
         self.testing = False
         self.stop_test = False
+        self.stop_event=threading.Event()
 
+        #Widżety GUI
         self.create_widgets()
 
+        #Dodanie kolejki
+        self.stage1_queue = queue.Queue()
     def setup_styles(self):
         """Konfiguruje style dla aplikacji"""
         self.style = ttk.Style()
@@ -80,7 +128,9 @@ class PasswordStrengthAnalyzer:
             filename=f"{category}.txt"
             try:
                 with open (filename, "r", encoding="utf-8") as f:
-                    hybrid_dict[category]=[line.strip() for line in f if line.strip()]
+                    hybrid_dict[category]=[line.strip().strip("'").strip('"')
+                        for line in f
+                        if line.strip()]
             except FileNotFoundError:
                 print(f"Brak pliku {filename}")
         return hybrid_dict
@@ -123,8 +173,12 @@ class PasswordStrengthAnalyzer:
                    command=self.start_brute_force_test).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Test Słownikowy",
                    command=self.start_dictionary_test).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Test Hybrydowy",
-                   command=self.start_hybrid_test).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Test Hybrydowy-Słownikowy",
+                   command=self.start_hybrid_dictionary).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Test Schematyczności",
+                   command=self.start_human_pattern_test).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Test Maski",
+                   command=self.start_mask).pack(side=tk.LEFT, padx=5)
         # Pasek postępu
         self.progress_var = tk.DoubleVar()
         self.progress_bar = ttk.Progressbar(main_frame, variable=self.progress_var,
@@ -227,14 +281,15 @@ class PasswordStrengthAnalyzer:
             strength = "Bardzo silne"
 
         return score, strength
+    def gui_safe(self, func, *args,**kwargs):
+        self.root.after(0,lambda:func(*args,**kwargs))
 
-    def on_the_fly_variants(word):
-        """Generuje warianty liter on_the_fly"""
-        for pattern in product([0,1],repeat=len(word)):
-            yield ''.join(
-                c.upper() if bit else c.lower()
-                for c, bit in zip(word, pattern)
-            )
+    def split_into_chunks(self,lst, n):
+        """Dzieli listę na części"""
+        if not lst:
+            return [[] for _ in range(n)]
+        k, m = divmod(len(lst), n)
+        return [lst[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(n)]
 
     def estimate_crack_time(self, password):
         """Szacuje czas potrzebny do złamania hasła"""
@@ -411,7 +466,6 @@ OCENA:
             self.update_stats(password)
             score_4, problems = self.calculate_password_strength_zxcvbn(password)
             ###Łączenie powtarzających się znaków specjalnych, liter oraz cyfr np: "aaaaa" w "a"
-            import re
             crack_test_password = re.sub(r'(.)\1+', r'\1', password)
             if len(crack_test_password) < len(password):
                 estimated_time = self.estimate_crack_time(crack_test_password)
@@ -464,6 +518,7 @@ OCENA:
                 report += "• Pamiętaj, aby nie używać go na wielu stronach.\n"
             report += f"\nWskazówka: Użyj menedżera haseł do generowania i przechowywania silnych haseł."
             self.result_text.insert(1.0, report)
+
     def update_strength_meter(self, score, strength):
         """Aktualizuje wskaźnik siły hasła"""
         self.strength_label.config(text=f"{strength} ({score}/100)")
@@ -497,6 +552,7 @@ OCENA:
         self.stats_labels['lowercase'].config(text=str(sum(1 for c in password if c.islower())))
         self.stats_labels['digits'].config(text=str(sum(1 for c in password if c.isdigit())))
         self.stats_labels['special'].config(text=str(sum(1 for c in password if not c.isalnum())))
+
     def brute_force_test(self, password):
         """Symuluje atak brute-force"""
         self.testing = True
@@ -644,87 +700,7 @@ OCENA:
         self.testing = False
         self.stop_button.config(state=tk.DISABLED)
         self.progress_var.set(100)
-    def hybrid_test_stage1_worker(file_path,hybrid_dict,password,name_chunk,adj_chunk,target_length):
-        """Worker dla pierwszego etapu ataku hybrydowego"""
-        specs=hybrid_dict['special']
-        candidates={"names":set(),"adjs":set(),"structures":set()}
-        for name in name_chunk:
-            for adj in adj_chunk:
-                for spec in specs:
-                    parts=[spec,name,adj]
-                    for p in permutations(parts):
-                        combo="".join(p)
-                        if len(combo)==target_length:
-                            candidates["names"].add(name)
-                            candidates["adjs"].add(adj)
-                            candidates["structures"].add(p)
-                            if combo==password:
-                                return {"found": True, "match":combo, "candidates":candidates}
-        return {"found": True,"candidates":candidates}
-    def hybrid_test(self, password):
-        """Symuluje atak hybrydowy"""
-        self.testing =True
-        self.stop_test=False
-        self.progress_var.set(0)
-        self.result_text.delete(1.0, tk.END)
-        start_time = time.time()
-        self.update_stats(password)
-        found = False
-        attempts = 0
-        hybrid_dict=self.load_hybrid_passwords()
-        # Pasek postępu dla ataku hybrydowego
-        #Mnozenie 3 wariantów names z 3 wariantami adjectives i 5 różnych kombinacji
-        base_combos = len(hybrid_dict['names']) * len(hybrid_dict['adjectives']) * len(hybrid_dict['special'])
-        total = base_combos * 3 * 3 *6 #5
-        self.result_text.delete(1.0, tk.END)
-        self.result_text.insert(1.0, f"Rozpoczynanie ataku hybrydowego...\n")
-        self.result_text.insert(tk.END, f"Rozmiar bazy: {total :,} haseł\n")
-        self.result_text.insert(tk.END, f"{'=' * 60}\n")
-        #Załadowanie części ze słownika hybrid_dict
-        parts=itertools.product(
-            hybrid_dict['names'],
-            hybrid_dict['adjectives'],
-            hybrid_dict['special']
-        )
-        for names, adjectives, special in parts:
-            if self.stop_test: break
-            #Dla imion i przymiotników sprawdzenie wariacji dla małych/dużych/pisanych kapitalikami
-            for name_var in {names.lower(), names.capitalize(), names.upper()}:
-                for adj_var in {adjectives.lower(), adjectives.capitalize(), adjectives.upper()}:
-                    # Składamy hasło z elementów słownika#
-                    combo_parts = [special, name_var, adj_var]
-                    variants = ["".join(p) for p in permutations(combo_parts)]
-                    for PPAP in variants:
-                        attempts += 1
-                        if PPAP==password:
-                            found=True
-                            break
-                            #Jeśli nie znajdzie to użyć funkcji bruteforce też zooptymalizowanie
-                        if attempts % 1000000 ==0:
-                            progress=(attempts/total)*100
-                            self.progress_var.set(progress)
-                            self.result_text.insert(tk.END, f"Próba {attempts:,}: {PPAP}\n")
-                            self.result_text.see(tk.END)
-                            self.root.update()
-            if found: break
-        elapsed_time = time.time() - start_time
-        # Wyświetlenie wyników
-        self.result_text.insert(tk.END, f"\n{'=' * 60}\n")
-        self.result_text.insert(tk.END, "WYNIK ATAKU HYBRYDOWEGO:\n")
-        self.result_text.insert(tk.END, f"{'=' * 60}\n")
-        self.result_text.insert(tk.END, f"Czas testu: {elapsed_time:.2f} sekund\n")
-        self.result_text.insert(tk.END, f"Liczba prób: {attempts:,}\n")
-        self.result_text.insert(tk.END, f"Hasło złamane: {'TAK' if found else 'NIE'}\n")
 
-        if found:
-            self.result_text.insert(tk.END, f"\n⚠️  UWAGA: Twoje hasło zostało złamane!\n")
-            self.result_text.insert(tk.END, f"Zalecenie: Natychmiast zmień to hasło na bardziej unikalne.\n")
-        else:
-            self.result_text.insert(tk.END, f"\n✓ Hasło nie znajduje się w bazie danych\n")
-
-        self.testing = False
-        self.stop_button.config(state=tk.DISABLED)
-        self.progress_var.set(100)
     def start_brute_force_test(self):
         """Uruchamia test brute-force w osobnym wątku"""
         password = self.password_entry.get()
@@ -740,7 +716,6 @@ OCENA:
         self.stop_button.config(state=tk.NORMAL)
         thread = Thread(target=self.brute_force_test, args=(password,), daemon=True)
         thread.start()
-
     def start_dictionary_test(self):
         """Uruchamia test słownikowy w osobnym wątku"""
         password = self.password_entry.get()
@@ -753,23 +728,8 @@ OCENA:
             messagebox.showwarning("Test w toku", "Poczekaj na zakończenie obecnego testu.")
             return
 
-        self.stop_button.config(state=tk.NORMAL)
+        self.stop_button.config(command=self.stop_test_func,state=tk.NORMAL)
         thread = Thread(target=self.dictionary_test, args=(password,), daemon=True)
-        thread.start()
-
-    def start_hybrid_test(self):
-        "Uruchamia test hybrydowy w osobnym wątku"
-        password = self.password_entry.get()
-        if not password:
-            messagebox.showwarning("Brak hasła", "Wprowadź hasło do testu.")
-            return
-
-        if self.testing:
-            messagebox.showwarning("Test w toku", "Poczekaj na zakończenie obecnego testu.")
-            return
-
-        self.stop_button.config(state=tk.NORMAL)
-        thread = Thread(target=self.hybrid_test, args=(password,), daemon=True)
         thread.start()
 
     def stop_test_func(self):
@@ -820,4 +780,5 @@ def main():
 
 
 if __name__ == "__main__":
+
     main()
