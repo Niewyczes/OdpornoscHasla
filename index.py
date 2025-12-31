@@ -38,6 +38,10 @@ from mask_test import (
     run_mask,
     finish_mask
 )
+
+from password_generator import(
+    open_password_generator_window
+)
 #----------------------------
 
 class PasswordStrengthAnalyzer:
@@ -60,9 +64,13 @@ class PasswordStrengthAnalyzer:
         self.run_mask = run_mask.__get__(self)
         self.finish_mask = finish_mask.__get__(self)
 
+        # --- PASSWORD GENERATOR ---
+        self.open_password_generator_window=open_password_generator_window.__get__(self)
+        #Koniec wywołań modułów
+
         self.root = root
         self.root.title("Analizator Siły Hasła")
-        self.root.geometry("700x650")
+        self.root.geometry("1000x650")
         self.root.resizable(True, True)
 
         # Stylizacja
@@ -179,16 +187,22 @@ class PasswordStrengthAnalyzer:
                    command=self.start_human_pattern_test).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Test Maski",
                    command=self.start_mask).pack(side=tk.LEFT, padx=5)
+
+        generator_frame = ttk.Frame(main_frame)
+        generator_frame.grid(row=3, column=0, columnspan=3, pady=(10,5))
+        ttk.Button(generator_frame, text="Generator Hasła",
+                   command=self.open_password_generator_window).pack(side=tk.LEFT, padx=5)
+
         # Pasek postępu
         self.progress_var = tk.DoubleVar()
         self.progress_bar = ttk.Progressbar(main_frame, variable=self.progress_var,
                                             maximum=100, length=300)
-        self.progress_bar.grid(row=3, column=0, columnspan=3, pady=(10, 5), sticky=(tk.W, tk.E))
+        self.progress_bar.grid(row=4, column=0, columnspan=3, pady=(10, 5), sticky=(tk.W, tk.E))
 
         # Przycisk stop
         self.stop_button = ttk.Button(main_frame, text="Stop Test",
                                       command=self.stop_test_func, state=tk.DISABLED)
-        self.stop_button.grid(row=4, column=0, columnspan=3, pady=(0, 10))
+        self.stop_button.grid(row=5, column=0, columnspan=3, pady=(0, 10))
 
         # Notatnik wyników
         ttk.Label(main_frame, text="Wyniki Analizy:",
@@ -282,14 +296,8 @@ class PasswordStrengthAnalyzer:
 
         return score, strength
     def gui_safe(self, func, *args,**kwargs):
+        """Wykonuje operację na GUI w głównym wątku dla uniknięcia błędów z tkniterem"""
         self.root.after(0,lambda:func(*args,**kwargs))
-
-    def split_into_chunks(self,lst, n):
-        """Dzieli listę na części"""
-        if not lst:
-            return [[] for _ in range(n)]
-        k, m = divmod(len(lst), n)
-        return [lst[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(n)]
 
     def estimate_crack_time(self, password):
         """Szacuje czas potrzebny do złamania hasła"""
@@ -471,6 +479,7 @@ OCENA:
                 estimated_time = self.estimate_crack_time(crack_test_password)
             else:
                 estimated_time = self.estimate_crack_time(password)
+            #Skala oceny hasła od 0 do 4
             strength_map = {
                 0: " Bardzo Słabe",
                 1: " Słabe",
@@ -735,6 +744,7 @@ OCENA:
     def stop_test_func(self):
         """Zatrzymuje aktualnie wykonywany test"""
         self.stop_test = True
+        self.stop_event.set()
 
     def get_recommendation(self, password):
         """Zwraca rekomendacje dotyczące hasła"""
@@ -762,7 +772,6 @@ OCENA:
         if recommendations:
             return "Zalecenia: " + ", ".join(recommendations)
         return "Hasło spełnia podstawowe wymagania bezpieczeństwa."
-
 
 def main():
     root = tk.Tk()

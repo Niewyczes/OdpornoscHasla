@@ -4,14 +4,12 @@ from tkinter import messagebox
 from threading import Thread
 from itertools import product
 
-#Co sie kryje pod znakami
 MASK_CHARSETS = {
     "?l": "abcdefghijklmnopqrstuvwxyz",
     "?u": "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
     "?d": "0123456789",
     "?s": "!@#$%^&*()_+-=[]{}|;:,.<>/?"
 }
-
 
 def start_mask(self):
     """Rozpoczyna atak maski"""
@@ -20,10 +18,13 @@ def start_mask(self):
         messagebox.showwarning("Brak hasła", "Wprowadź hasło do testu.")
         return
 
+    self.update_stats(password)
     self.testing = True
+    self.stop_test = False
     self.stop_event.clear()
     self.start_time = time.time()
 
+    self.stop_button.config(state=tk.NORMAL)
     self.result_text.delete(1.0, tk.END)
     self.gui_safe(self.result_text.insert, tk.END,
                   "Test mask attack (Etap 3)\n")
@@ -34,7 +35,6 @@ def start_mask(self):
 
 def run_mask(self, password):
     """Symuluje atak bruteforce z maską"""
-    # Generowanie maski
     mask = ""
     for ch in password:
         if ch.islower(): mask += "?l"
@@ -42,10 +42,8 @@ def run_mask(self, password):
         elif ch.isdigit(): mask += "?d"
         else: mask += "?s"
 
-    # Tworzenie listy z charsetów
     charsets = [MASK_CHARSETS[m] for m in [mask[i:i+2] for i in range(0, len(mask), 2)]]
 
-    # Obliczanie liczby kombinacji
     total = 1
     for cs in charsets:
         total *= len(cs)
@@ -55,13 +53,13 @@ def run_mask(self, password):
                   f"Liczba kombinacji: {total:,}\n"
                   f"Rozpoczynam mask attack...\n\n")
 
-    MAX_TIME = 10  #Limit czasu dla symulacji 10 sekund
-
+    MAX_TIME = 10
     attempts = 0
+
     for combo in product(*charsets):
 
-        #  STOP TEST
-        if self.stop_event.is_set():
+
+        if self.stop_event.is_set() or self.stop_test:
             break
 
         # LIMIT CZASU
@@ -75,8 +73,9 @@ def run_mask(self, password):
         if attempts % 5000 == 0:
             progress = (attempts / total) * 100
             self.progress_var.set(progress)
+            time.sleep(0.0001)  
 
-        # Wyświetlanie co jakiś czas
+        # Log co jakiś czas
         if attempts % 100000 == 0:
             self.gui_safe(self.result_text.insert, tk.END,
                           f"Próba {attempts:,}: {guess}\n")
@@ -101,15 +100,10 @@ def finish_mask(self, mask, elapsed_time, found, attempts):
     self.result_text.insert(tk.END, f"Czas testu: {elapsed_time:.2f} sekund\n")
     self.result_text.insert(tk.END, f"Hasło znalezione: {'TAK' if found else 'NIE'}\n")
 
-    # Znaleziono hasło
     if found:
         self.result_text.insert(tk.END, "\n⚠️ Hasło zostało złamane mask attack!\n")
-
-    # Test został zatrzymany
-    elif self.stop_event.is_set():
+    elif self.stop_event.is_set() or self.stop_test:
         self.result_text.insert(tk.END, "\n⛔ Test zatrzymany przez użytkownika.\n")
-
-    # Test zakończył się limit symulacji/hasło nieznalezione
     else:
         self.result_text.insert(tk.END, "\n✓ Mask attack zakończony — hasła nie znaleziono.\n")
 

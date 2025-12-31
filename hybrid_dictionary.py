@@ -147,5 +147,5 @@ def finish_hybrid_dictionary(self, found, match, attempts, elapsed_time):
         )
 
     self.testing = False
-    self.stop_button.config(state=tk.DISABLED)
+    self.stop_button.config(command=self.stop_test_func,state=tk.NORMAL)
     self.progress_var.set(100)
