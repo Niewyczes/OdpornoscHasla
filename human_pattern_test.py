@@ -3,6 +3,8 @@ import tkinter as tk
 from tkinter import messagebox
 from threading import Thread
 import random
+
+
 def start_human_pattern_test(self):
     """"Rozpoczyna test human pattern"""
     password = self.password_entry.get()
@@ -17,6 +19,7 @@ def start_human_pattern_test(self):
     self.start_time = time.time()
     self.attempts = 0
     self.last_scroll = 0
+    self.last_progress_update = 0   # 🔥 KLUCZOWE — bez tego pasek nie działa
 
     self.stop_button.config(state=tk.NORMAL)
     self.result_text.delete(1.0, tk.END)
@@ -39,7 +42,6 @@ def run_human_pattern_test(self, password):
     start = time.time()
     found = False
     matched_pattern = None
-
 
     while time.time() - start < MAX_TIME and not self.stop_event.is_set() and not self.stop_test:
 
@@ -69,13 +71,21 @@ def run_human_pattern_test(self, password):
 
             self.attempts += 1
 
-            if self.attempts % 10000 == 0:
+            # 🔥 Aktualizacja paska co 50 ms
+            now = time.time()
+            if now - self.last_progress_update > 0.05:
+                progress = ((now - start) / MAX_TIME) * 100
+                self.gui_safe(self.progress_var.set, min(progress, 100))
+                self.last_progress_update = now
 
+            # Logowanie co 200k prób
+            if self.attempts % 200000 == 0:
                 self.gui_safe(self.result_text.insert, tk.END,
                               f"Próba {self.attempts:,}: {p}\n")
-                now = time.time()
-                if now - self.last_scroll > 0.2:
-                    self.gui_safe(lambda:self.result_text.see (tk.END))
+                self.result_text.see(tk.END)
+
+                if now - self.last_scroll > 0.4:
+                    self.gui_safe(lambda: self.result_text.see(tk.END))
                     self.last_scroll = now
 
             if p == password:

@@ -19,14 +19,6 @@ import re
 import queue
 #Zainportowane moduły
 #------------------------
-from hybrid_dictionary import (
-    start_hybrid_dictionary,
-    run_hybrid_dictionary,
-    hybrid_dictionary_worker,
-    on_done_hybrid_dictionary,
-    finish_hybrid_dictionary
-)
-
 from human_pattern_test import (
     start_human_pattern_test,
     run_human_pattern_test,
@@ -47,12 +39,6 @@ from password_generator import(
 class PasswordStrengthAnalyzer:
     def __init__(self, root):
         #Dodanie wywoływań modułów
-        # --- HYBRID DICTIONARY ---
-        self.start_hybrid_dictionary = start_hybrid_dictionary.__get__(self)
-        self.run_hybrid_dictionary = run_hybrid_dictionary.__get__(self)
-        self.hybrid_dictionary_worker = hybrid_dictionary_worker.__get__(self)
-        self.on_done_hybrid_dictionary = on_done_hybrid_dictionary.__get__(self)
-        self.finish_hybrid_dictionary = finish_hybrid_dictionary.__get__(self)
 
         # --- HUMAN PATTERN TEST ---
         self.start_human_pattern_test = start_human_pattern_test.__get__(self)
@@ -181,8 +167,6 @@ class PasswordStrengthAnalyzer:
                    command=self.start_brute_force_test).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Test Słownikowy",
                    command=self.start_dictionary_test).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Test Hybrydowy-Słownikowy",
-                   command=self.start_hybrid_dictionary).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Test Schematyczności",
                    command=self.start_human_pattern_test).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Test Maski",
@@ -410,9 +394,9 @@ OCENA:
         report += f"\nWskazówka: Użyj menedżera haseł do generowania i przechowywania silnych haseł."
 
         self.result_text.insert(1.0, report)
-        # Wstępnie dodany zxcvbn
+
     def calculate_password_strength_zxcvbn(self, password):
-            "Oblicza siłę hasła za pomocą ZXCVBN-like"
+            """Oblicza siłę hasła za pomocą ZXCVBN-like"""
             length = len(password)
             score_100 = 0
             problems = []
@@ -449,7 +433,7 @@ OCENA:
                     problems.append(f"Zawiera rok lub datę: '{year}'.")
                     break
             #Ustawianie granicy , aby nie dawało wysokiego wyniku hasłom z błedami
-            if problems and score_100 > 60:
+            if problems and score_100 > 40:
                 score_100 = 60
             # Zamiana wyniku z skali 0 do 100 na skale od 0 do 4
             final_score_100 = max(0, min(100, score_100))
@@ -466,7 +450,7 @@ OCENA:
             return score_zxcvbn, problems
 
     def analyze_password_strength_zxcvbn(self):
-            "Analizuje siłę hasła za pomocą ZXCVBN-like (0-4) i tworzy raport"
+            """Analizuje siłę hasła za pomocą ZXCVBN-like (0-4) i tworzy raport"""
             password = self.password_entry.get()
             if not password:
                 messagebox.showwarning("Brak hasła", "Wprowadź hasło do analizy.")

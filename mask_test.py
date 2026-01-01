@@ -3,11 +3,15 @@ import tkinter as tk
 from tkinter import messagebox
 from threading import Thread
 from itertools import product
-
+#znaki dla maski i co one oznaczają
 MASK_CHARSETS = {
+    #znak będzie małą literą
     "?l": "abcdefghijklmnopqrstuvwxyz",
+    #znak będzie dużą literą
     "?u": "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+    #znak będzie liczbą
     "?d": "0123456789",
+    #znak będzie znakiem specjalnym
     "?s": "!@#$%^&*()_+-=[]{}|;:,.<>/?"
 }
 
@@ -79,6 +83,7 @@ def run_mask(self, password):
         if attempts % 100000 == 0:
             self.gui_safe(self.result_text.insert, tk.END,
                           f"Próba {attempts:,}: {guess}\n")
+            self.result_text.see(tk.END)
 
         # Trafienie hasła
         if guess == password:
@@ -91,15 +96,33 @@ def run_mask(self, password):
 
 def finish_mask(self, mask, elapsed_time, found, attempts):
     """Raport ataku maskowego"""
+
+    # Statystyki maski
+    stats = {
+        "?l": mask.count("?l"),
+        "?u": mask.count("?u"),
+        "?d": mask.count("?d"),
+        "?s": mask.count("?s")
+    }
+
     self.result_text.insert(tk.END, f"\n{'=' * 60}\n")
     self.result_text.insert(tk.END, "WYNIK MASK ATTACK:\n")
     self.result_text.insert(tk.END, f"{'=' * 60}\n")
 
+    # Dane maski
     self.result_text.insert(tk.END, f"Maska: {mask}\n")
+    self.result_text.insert(tk.END, "Statystyka maski:\n")
+    self.result_text.insert(tk.END, f"  Małe litery (?l): {stats['?l']}\n")
+    self.result_text.insert(tk.END, f"  Duże litery (?u): {stats['?u']}\n")
+    self.result_text.insert(tk.END, f"  Cyfry (?d): {stats['?d']}\n")
+    self.result_text.insert(tk.END, f"  Znaki specjalne (?s): {stats['?s']}\n")
+
+    # Wyniki testu
     self.result_text.insert(tk.END, f"Liczba prób: {attempts:,}\n")
     self.result_text.insert(tk.END, f"Czas testu: {elapsed_time:.2f} sekund\n")
     self.result_text.insert(tk.END, f"Hasło znalezione: {'TAK' if found else 'NIE'}\n")
 
+    # Komunikat końcowy
     if found:
         self.result_text.insert(tk.END, "\n⚠️ Hasło zostało złamane mask attack!\n")
     elif self.stop_event.is_set() or self.stop_test:
@@ -107,6 +130,8 @@ def finish_mask(self, mask, elapsed_time, found, attempts):
     else:
         self.result_text.insert(tk.END, "\n✓ Mask attack zakończony — hasła nie znaleziono.\n")
 
+    # Reset stanu
     self.testing = False
     self.stop_button.config(state=tk.DISABLED)
     self.progress_var.set(100)
+
