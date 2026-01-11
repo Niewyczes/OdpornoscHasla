@@ -75,19 +75,125 @@ class PasswordStrengthAnalyzer:
 
         #Dodanie kolejki
         self.stage1_queue = queue.Queue()
+
     def setup_styles(self):
-        """Konfiguruje style dla aplikacji"""
         self.style = ttk.Style()
         self.style.theme_use('clam')
 
-        # Kolory
-        self.colors = {
-            'very_weak': '#ff0000',
-            'weak': '#ff6666',
-            'medium': '#ffcc00',
-            'strong': '#66cc66',
-            'very_strong': '#006600'
+        # ===== MOTYWY =====
+        self.themes = {
+            'Light': {
+                'bg': '#f5f6fa',
+                'fg': '#000000',
+                'accent': '#4a6cf7',
+                'accent_hover': '#3b5bdb',
+                'danger': '#e03131',
+                'entry_bg': '#ffffff'
+            },
+            'Dark': {
+                'bg': '#1e1e1e',
+                'fg': '#ffffff',
+                'accent': '#5c7cfa',
+                'accent_hover': '#748ffc',
+                'danger': '#ff6b6b',
+                'entry_bg': '#2b2b2b'
+            },
+            'Blue': {
+                'bg': '#e7f0ff',
+                'fg': '#002766',
+                'accent': '#1c7ed6',
+                'accent_hover': '#1971c2',
+                'danger': '#fa5252',
+                'entry_bg': '#ffffff'
+            },
+            'Hacker': {
+                'bg': '#000000',
+                'fg': '#00ff00',
+                'accent': '#00cc00',
+                'accent_hover': '#00ff00',
+                'danger': '#ff0000',
+                'entry_bg': '#001100'
+            }
         }
+
+        self.current_theme = 'Light'
+
+        # Kolory siły hasła (zostają jak były)
+        self.colors = {
+            'very_weak': '#ff4d4d',
+            'weak': '#ff9999',
+            'medium': '#ffd43b',
+            'strong': '#69db7c',
+            'very_strong': '#2f9e44'
+        }
+
+        self.apply_theme()
+
+    def apply_theme(self):
+        t = self.themes[self.current_theme]
+
+        # Global
+        self.style.configure('.', font=('Segoe UI', 10))
+
+        # Tło
+        self.style.configure('TFrame', background=t['bg'])
+        self.style.configure('TLabel', background=t['bg'], foreground=t['fg'])
+
+        self.style.configure('TLabelframe', background=t['bg'], foreground=t['fg'])
+        self.style.configure(
+            'TLabelframe.Label',
+            background=t['bg'],
+            foreground=t['fg'],
+            font=('Segoe UI', 10, 'bold')
+        )
+
+        # Entry
+        self.style.configure(
+            'TEntry',
+            fieldbackground=t['entry_bg'],
+            foreground=t['fg'],
+            padding=6
+        )
+
+        # ===== PRZYCISKI =====
+        self.style.configure(
+            'TButton',
+            background=t['accent'],
+            foreground='white',
+            padding=(12, 6),
+            borderwidth=0
+        )
+
+        self.style.map(
+            'TButton',
+            background=[
+                ('active', t['accent_hover']),
+                ('disabled', '#888888')
+            ]
+        )
+
+        # Przycisk STOP
+        self.style.configure(
+            'Danger.TButton',
+            background=t['danger'],
+            foreground='white'
+        )
+
+        self.style.map(
+            'Danger.TButton',
+            background=[('active', t['danger'])]
+        )
+
+        # Progressbar
+        self.style.configure(
+            'TProgressbar',
+            thickness=18,
+            background=t['accent']
+        )
+
+    def change_theme(self, event=None):
+         self.current_theme = self.selected_theme.get()
+         self.apply_theme()
 
     def load_common_passwords(self):
         """Ładuje listę popularnych haseł"""
@@ -133,6 +239,23 @@ class PasswordStrengthAnalyzer:
         """Tworzy wszystkie elementy GUI"""
         # Ramka główna
         main_frame = ttk.Frame(self.root, padding="10")
+        theme_frame = ttk.Frame(main_frame)
+        theme_frame.grid(row=0, column=2, sticky=tk.E)
+
+        ttk.Label(theme_frame, text="Motyw:").pack(side=tk.LEFT, padx=(0, 5))
+
+        self.selected_theme = tk.StringVar(value=self.current_theme)
+
+        theme_selector = ttk.Combobox(
+            theme_frame,
+            textvariable=self.selected_theme,
+            values=list(self.themes.keys()),
+            state="readonly",
+            width=12
+        )
+        theme_selector.pack(side=tk.LEFT)
+        theme_selector.bind("<<ComboboxSelected>>", self.change_theme)
+
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
 
         # Konfiguracja grid
